@@ -6,19 +6,22 @@
  * the file LICENSE, distributed as part of this software.
  */
 
-import { useEffect, useState } from 'react';
-import { Image, Button, ButtonGroup, Tooltip, Box } from '@chakra-ui/react';
+import { Box, Button, ButtonGroup, Image, Tooltip } from '@chakra-ui/react';
+import { useEffect, useMemo, useState } from 'react';
 // Icons
-import { MdFileDownload } from 'react-icons/md';
+import { AiOutlineMinus } from 'react-icons/ai';
 import { HiPencilAlt } from 'react-icons/hi';
-
+import { MdFileDownload } from 'react-icons/md';
 // Utility functions from SAGE3
-import { useThrottleScale, useAssetStore, useAppStore, useMeasure, downloadFile, isUUIDv4, apiUrls, } from '@sage3/frontend';
+import { apiUrls, downloadFile, isUUIDv4, useAppStore, useAssetStore, useMeasure, useThrottleScale } from '@sage3/frontend';
 import { Asset, ExtraImageType, ImageInfoType } from '@sage3/shared/types';
 
 import { AppWindow } from '../../components';
-import { state as AppState } from './index';
 import { App } from '../../schema';
+import { state as AppState } from './index';
+
+import ImageSegmentButton from './ImageSegmentButton';
+import ImageSegmentOverlay from './ImageSegmentOverlay';
 
 /**
  * ImageViewer app
@@ -115,6 +118,9 @@ function AppComponent(props: App): JSX.Element {
         }}
       >
         <>
+          {s.segments && s.segments.length > 0 ? (
+            <ImageSegmentOverlay width={origSizes.width} height={origSizes.height} segments={s.segments} />
+          ) : null}
           <Image
             width="100%"
             userSelect={'auto'}
@@ -124,28 +130,30 @@ function AppComponent(props: App): JSX.Element {
             borderRadius="0 0 6px 6px"
           />
 
-          {s.boxes ? Object.keys(s.boxes).map((label, idx) => {
-            // TODO Need to handle text overflow for labels
-            return (
-              <Box
-                key={label + idx}
-                position="absolute"
-                left={s.boxes[label].xmin * (displaySize.width / origSizes.width) + 'px'}
-                top={s.boxes[label].ymin * (displaySize.height / origSizes.height) + 'px'}
-                width={(s.boxes[label].xmax - s.boxes[label].xmin) * (displaySize.width / origSizes.width) + 'px'}
-                height={(s.boxes[label].ymax - s.boxes[label].ymin) * (displaySize.height / origSizes.height) + 'px'}
-                border="2px solid red"
-                style={{ display: s.annotations === true ? 'block' : 'none' }}
-              >
-                <Box position="relative" top={'-1.5rem'} fontWeight={'bold'} textColor={'black'}>
-                  {label}
-                </Box>
-              </Box>
-            );
-          }) : null}
+          {s.boxes
+            ? Object.keys(s.boxes).map((label, idx) => {
+                // TODO Need to handle text overflow for labels
+                return (
+                  <Box
+                    key={label + idx}
+                    position="absolute"
+                    left={s.boxes[label].xmin * (displaySize.width / origSizes.width) + 'px'}
+                    top={s.boxes[label].ymin * (displaySize.height / origSizes.height) + 'px'}
+                    width={(s.boxes[label].xmax - s.boxes[label].xmin) * (displaySize.width / origSizes.width) + 'px'}
+                    height={(s.boxes[label].ymax - s.boxes[label].ymin) * (displaySize.height / origSizes.height) + 'px'}
+                    border="2px solid red"
+                    style={{ display: s.annotations === true ? 'block' : 'none' }}
+                  >
+                    <Box position="relative" top={'-1.5rem'} fontWeight={'bold'} textColor={'black'}>
+                      {label}
+                    </Box>
+                  </Box>
+                );
+              })
+            : null}
         </>
-      </div >
-    </AppWindow >
+      </div>
+    </AppWindow>
   );
 }
 
@@ -170,6 +178,8 @@ function ToolbarComponent(props: App): JSX.Element {
     }
   }, [s.assetid, assets]);
 
+  const url = useMemo(() => (file != null ? file?.data.file : s.assetid), [file, s.assetid]);
+
   return (
     <>
       <ButtonGroup isAttached size="xs" colorScheme="teal">
@@ -177,12 +187,10 @@ function ToolbarComponent(props: App): JSX.Element {
           <Button
             onClick={() => {
               if (file) {
-                const url = file?.data.file;
                 const filename = file?.data.originalfilename;
                 const dl = apiUrls.assets.getAssetById(url);
                 downloadFile(dl, filename);
               } else {
-                const url = s.assetid;
                 const filename = props.data.title || s.assetid.split('/').pop();
                 downloadFile(url, filename);
               }
@@ -202,6 +210,15 @@ function ToolbarComponent(props: App): JSX.Element {
             </Button>
           </Tooltip>
         </div>
+        {s.segments && s.segments.length === 0 ? (
+          <ImageSegmentButton imageUri={url} onFetch={(segments) => updateState(props._id, { segments })} />
+        ) : (
+          <Tooltip placement="top-start" hasArrow={true} label={'Remove Segments'} openDelay={400}>
+            <Button onClick={() => updateState(props._id, { segments: [] })}>
+              <AiOutlineMinus />
+            </Button>
+          </Tooltip>
+        )}
       </ButtonGroup>
     </>
   );
@@ -234,6 +251,8 @@ function getImageUrl(src: string, sizes: ImageInfoType[], width: number): string
  * Grouped App toolbar component, this component will display when a group of apps are selected
  * @returns JSX.Element | null
  */
-const GroupedToolbarComponent = () => { return null; };
+const GroupedToolbarComponent = () => {
+  return null;
+};
 
 export default { AppComponent, ToolbarComponent, GroupedToolbarComponent };

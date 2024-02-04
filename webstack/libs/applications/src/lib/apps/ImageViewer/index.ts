@@ -22,10 +22,22 @@ const bboxType = z.record(
   })
 );
 
+export type Vertex = z.infer<typeof segmentVertexType>;
+const segmentVertexType = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+
+const segmentsType = z.array(
+  z.array(segmentVertexType)
+);
+export type Segments = z.infer<typeof segmentsType>;
+
 export const schema = z.object({
   assetid: z.string(),
   annotations: z.boolean(),
   boxes: bboxType,
+  segments: segmentsType,
   executeInfo: z.object({
     executeFunc: z.string(),
     params: z.any(),
@@ -38,6 +50,7 @@ export const init: Partial<state> = {
   assetid: '',
   annotations: false,
   boxes: {},
+  segments: [],
 };
 
 export const name = 'ImageViewer';
