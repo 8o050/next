@@ -72,16 +72,37 @@ function generateNonOverlappingSegments(
 
   return segments;
 }
-type Props = {
+
+type Image = {
+  appId: string;
   imageUri: string;
-  onFetch: (segments: Segments) => void;
 };
 
-const ImageSegmentButton: React.FC<Props> = ({ imageUri, onFetch }) => {
+type OnFetchData = {
+  appId: string;
+  segments: Segments;
+};
+
+type Props = {
+  images: Image[];
+  onClick?: (appId: string) => void;
+  onFetch: (data: OnFetchData) => void;
+};
+
+export const ImageSegmentButton: React.FC<Props> = ({ images, onClick, onFetch }) => {
   const onButtonClick = useCallback(() => {
-    // Call a model to get the segmentations.
-    onFetch(generateNonOverlappingSegments(5, 2, 8, 400, 400));
-  }, [imageUri, onFetch]);
+    images.forEach(({ appId }) => {
+      onClick && onClick(appId);
+      setTimeout(
+        () =>
+          onFetch({
+            appId,
+            segments: generateNonOverlappingSegments(5, 2, 8, 400, 400),
+          }),
+        300
+      );
+    });
+  }, [images, onFetch]);
   return (
     <Tooltip placement="top-start" hasArrow={true} label={'Segment Image'} openDelay={400}>
       <Button onClick={onButtonClick}>
@@ -90,5 +111,3 @@ const ImageSegmentButton: React.FC<Props> = ({ imageUri, onFetch }) => {
     </Tooltip>
   );
 };
-
-export default ImageSegmentButton;

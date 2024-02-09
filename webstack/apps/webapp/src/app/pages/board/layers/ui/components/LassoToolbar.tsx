@@ -11,36 +11,36 @@ import { useParams } from 'react-router';
 
 import {
   Box,
-  useColorModeValue,
-  Text,
   Button,
-  Tooltip,
-  useDisclosure,
   Menu,
   MenuButton,
+  MenuDivider,
+  MenuGroup,
   MenuItem,
   MenuList,
-  MenuGroup,
-  MenuDivider,
+  Text,
+  Tooltip,
+  useColorModeValue,
+  useDisclosure,
 } from '@chakra-ui/react';
 
-import { MdCopyAll, MdSend, MdZoomOutMap, MdChat, MdLock, MdAdd, MdLink, MdRepeat, MdEdit, MdMenu, MdPin, MdPinDrop } from 'react-icons/md';
-import { HiOutlineTrash } from 'react-icons/hi';
 import { FaPython } from 'react-icons/fa';
+import { HiOutlineTrash } from 'react-icons/hi';
+import { MdChat, MdCopyAll, MdMenu, MdPinDrop, MdSend, MdZoomOutMap } from 'react-icons/md';
 
+import { Applications } from '@sage3/applications/apps';
+import { AppSchema } from '@sage3/applications/schema';
 import {
   ConfirmModal,
+  setupApp,
   useAbility,
   useAppStore,
   useBoardStore,
+  useCursorBoardPosition,
   useHexColor,
   useThrottleApps,
   useUIStore,
-  setupApp,
-  useCursorBoardPosition,
 } from '@sage3/frontend';
-import { Applications } from '@sage3/applications/apps';
-import { AppSchema } from '@sage3/applications/schema';
 import { Board } from '@sage3/shared/types';
 
 /**

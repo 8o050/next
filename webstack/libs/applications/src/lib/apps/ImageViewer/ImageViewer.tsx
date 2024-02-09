@@ -6,7 +6,7 @@
  * the file LICENSE, distributed as part of this software.
  */
 
-import { Box, Button, ButtonGroup, Image, Tooltip } from '@chakra-ui/react';
+import { Box, Button, ButtonGroup, Image, Spinner, Tooltip } from '@chakra-ui/react';
 import { useEffect, useMemo, useState } from 'react';
 // Icons
 import { AiOutlineMinus } from 'react-icons/ai';
@@ -20,7 +20,7 @@ import { AppWindow } from '../../components';
 import { App } from '../../schema';
 import { state as AppState } from './index';
 
-import ImageSegmentButton from './ImageSegmentButton';
+import { ImageSegmentButton } from './ImageSegmentButton';
 import ImageSegmentOverlay from './ImageSegmentOverlay';
 
 /**
@@ -31,6 +31,7 @@ import ImageSegmentOverlay from './ImageSegmentOverlay';
  */
 function AppComponent(props: App): JSX.Element {
   const s = props.data.state as AppState;
+  const updateState = useAppStore((state) => state.updateState);
   const assets = useAssetStore((state) => state.assets);
   const update = useAppStore((state) => state.update);
 
@@ -48,6 +49,12 @@ function AppComponent(props: App): JSX.Element {
   const [ref, displaySize] = useMeasure<HTMLDivElement>();
   // Original image sizes
   const [origSizes, setOrigSizes] = useState({ width: 0, height: 0 });
+
+  // Update the imageUri in the app state to make it easier to
+  // access it in the grouped action
+  useEffect(() => {
+    updateState(props._id, { imageUri: url });
+  }, [url]);
 
   // Convert the ID to an asset
   useEffect(() => {
@@ -118,6 +125,20 @@ function AppComponent(props: App): JSX.Element {
         }}
       >
         <>
+          {s.segmentsLoading === true ? (
+            <Spinner
+              speed="1s"
+              emptyColor="gray.200"
+              thickness="5px"
+              size="xl"
+              style={{
+                position: 'absolute',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                top: '50%',
+              }}
+            />
+          ) : null}
           {s.segments && s.segments.length > 0 ? (
             <ImageSegmentOverlay width={origSizes.width} height={origSizes.height} segments={s.segments} />
           ) : null}
@@ -210,8 +231,14 @@ function ToolbarComponent(props: App): JSX.Element {
             </Button>
           </Tooltip>
         </div>
+      </ButtonGroup>
+      <ButtonGroup isAttached size="xs" colorScheme="pink" ml="1" mr="0" p={0}>
         {s.segments && s.segments.length === 0 ? (
-          <ImageSegmentButton imageUri={url} onFetch={(segments) => updateState(props._id, { segments })} />
+          <ImageSegmentButton
+            images={[{ appId: props._id, imageUri: url }]}
+            onFetch={({ appId, segments }) => updateState(appId, { segments, segmentsLoading: false })}
+            onClick={(appId) => updateState(appId, { segmentsLoading: true })}
+          />
         ) : (
           <Tooltip placement="top-start" hasArrow={true} label={'Remove Segments'} openDelay={400}>
             <Button onClick={() => updateState(props._id, { segments: [] })}>
@@ -251,8 +278,28 @@ function getImageUrl(src: string, sizes: ImageInfoType[], width: number): string
  * Grouped App toolbar component, this component will display when a group of apps are selected
  * @returns JSX.Element | null
  */
-const GroupedToolbarComponent = () => {
-  return null;
+const GroupedToolbarComponent = ({ apps }: { apps: App[] }) => {
+  const updateState = useAppStore((state) => state.updateState);
+  const images = useMemo(() => {
+    return apps.map(({ _id: appId, data: { state: imageUri } }) => ({
+      appId,
+      imageUri,
+    }));
+  }, [apps]);
+  return (
+    <ButtonGroup isAttached size="xs" colorScheme="pink" ml="0" mr="1" p={0}>
+      <ImageSegmentButton
+        images={images}
+        onFetch={({ appId, segments }) => updateState(appId, { segments, segmentsLoading: false })}
+        onClick={(appId) => updateState(appId, { segmentsLoading: true })}
+      />
+      <Tooltip placement="top-start" hasArrow={true} label={'Remove Segments'} openDelay={400}>
+        <Button onClick={() => apps.forEach(({ _id: appId }) => updateState(appId, { segments: [] }))}>
+          <AiOutlineMinus />
+        </Button>
+      </Tooltip>
+    </ButtonGroup>
+  );
 };
 
 export default { AppComponent, ToolbarComponent, GroupedToolbarComponent };

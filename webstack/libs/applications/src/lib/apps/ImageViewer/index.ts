@@ -38,10 +38,12 @@ export const schema = z.object({
   annotations: z.boolean(),
   boxes: bboxType,
   segments: segmentsType,
+  segmentsLoading: z.boolean(),
   executeInfo: z.object({
     executeFunc: z.string(),
     params: z.any(),
   }),
+  imageUri: z.string(),
 });
 export type state = z.infer<typeof schema>;
 
@@ -51,6 +53,8 @@ export const init: Partial<state> = {
   annotations: false,
   boxes: {},
   segments: [],
+  segmentsLoading: false,
+  imageUri: '',
 };
 
 export const name = 'ImageViewer';
