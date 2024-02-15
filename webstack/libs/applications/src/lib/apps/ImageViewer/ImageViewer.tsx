@@ -18,7 +18,7 @@ import { Asset, ExtraImageType, ImageInfoType } from '@sage3/shared/types';
 
 import { AppWindow } from '../../components';
 import { App } from '../../schema';
-import { state as AppState } from './index';
+import { state as AppState, state } from './index';
 
 import { ImageSegmentButton } from './ImageSegmentButton';
 import ImageSegmentOverlay from './ImageSegmentOverlay';
@@ -53,8 +53,8 @@ function AppComponent(props: App): JSX.Element {
   // Update the imageUri in the app state to make it easier to
   // access it in the grouped action
   useEffect(() => {
-    updateState(props._id, { imageUri: url });
-  }, [url]);
+    updateState(props._id, { imageUri: sizes[0]?.url });
+  }, [sizes]);
 
   // Convert the ID to an asset
   useEffect(() => {
@@ -112,6 +112,28 @@ function AppComponent(props: App): JSX.Element {
     }
   }, [url, sizes, displaySize, scale]);
 
+  useEffect(() => {
+    if (s.jobUUIDs == null) {
+      return;
+    }
+    console.log(s.jobUUIDs)
+    const fetchSegData = async () => {
+      Object.entries(s.jobUUIDs).forEach(async ([uuid, value]) => {
+        if (value) {
+          const response = await fetch(`/segment/${uuid}`);
+          const segments = await response.json();
+
+          // Delete the job from the state
+          const newJobUUID = {...s.jobUUIDs};
+          delete newJobUUID[uuid];
+
+          updateState(props._id, {jobUUIDs: newJobUUID, segments, segmentsLoading: false})
+        }
+      });
+    }
+    void fetchSegData();
+  }, [s.jobUUIDs])
+
   return (
     // background false to handle alpha channel
     <AppWindow app={props} lockAspectRatio={aspectRatio} background={false}>
@@ -133,14 +155,14 @@ function AppComponent(props: App): JSX.Element {
               size="xl"
               style={{
                 position: 'absolute',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                top: '50%',
+                right: '16px',
+                bottom: '16px',
               }}
+              label='Generating Segments...'
             />
           ) : null}
           {s.segments && s.segments.length > 0 ? (
-            <ImageSegmentOverlay width={origSizes.width} height={origSizes.height} segments={s.segments} />
+            <ImageSegmentOverlay width={displaySize.width} height={displaySize.height} segments={s.segments} />
           ) : null}
           <Image
             width="100%"
@@ -233,11 +255,31 @@ function ToolbarComponent(props: App): JSX.Element {
         </div>
       </ButtonGroup>
       <ButtonGroup isAttached size="xs" colorScheme="pink" ml="1" mr="0" p={0}>
-        {s.segments && s.segments.length === 0 ? (
+        {s.segmentsLoading ? <Button disabled><Spinner
+              speed="1s"
+              emptyColor="transparent"
+              thickness="2px"
+              size="sm"
+              label='Generating Segments...'
+            /></Button> : s.segments && s.segments.length === 0 ? (
           <ImageSegmentButton
-            images={[{ appId: props._id, imageUri: url }]}
-            onFetch={({ appId, segments }) => updateState(appId, { segments, segmentsLoading: false })}
-            onClick={(appId) => updateState(appId, { segmentsLoading: true })}
+            images={[{ appId: props._id, imageUri: s.imageUri }]}
+            onStartGeneration={({ appId, uuid }) => {
+              updateState(appId, {jobUUIDs: {
+                ...s.jobUUIDs,
+                [uuid]: false
+              }, segmentsLoading: true});
+
+              // TODO: Remove this state change simulation after
+              // the serverside work is done.
+              setTimeout(() => {
+                  updateState(appId, {jobUUIDs: {
+                    ...s.jobUUIDs,
+                    [uuid]: true
+                  }});
+              }, 60*1000);
+            }
+          }
           />
         ) : (
           <Tooltip placement="top-start" hasArrow={true} label={'Remove Segments'} openDelay={400}>
@@ -281,17 +323,47 @@ function getImageUrl(src: string, sizes: ImageInfoType[], width: number): string
 const GroupedToolbarComponent = ({ apps }: { apps: App[] }) => {
   const updateState = useAppStore((state) => state.updateState);
   const images = useMemo(() => {
-    return apps.map(({ _id: appId, data: { state: imageUri } }) => ({
-      appId,
-      imageUri,
-    }));
+    return apps.map(({ _id: appId, data}) => {
+      const imageState: state = data.state;
+      return {
+        appId,
+        imageUri: imageState.imageUri,
+      }
+    });
   }, [apps]);
   return (
     <ButtonGroup isAttached size="xs" colorScheme="pink" ml="0" mr="1" p={0}>
       <ImageSegmentButton
         images={images}
-        onFetch={({ appId, segments }) => updateState(appId, { segments, segmentsLoading: false })}
-        onClick={(appId) => updateState(appId, { segmentsLoading: true })}
+        onStartGeneration={({ appId, uuid }) => {
+          const app = apps.find(app => app._id === appId);
+
+          // App dosn't exist.
+          if (app == null) {
+            return
+          }
+
+          const state = app.data.state;
+
+          // Don't start when segments are currently loading.
+          if (state.segmentsLoading) {
+            return;
+          }
+
+          updateState(appId, {jobUUIDs: {
+            ...state.jobUUIDs,
+            [uuid]: false,
+          }, segmentsLoading: true});
+ 
+          // TODO: Remove this state change simulation after
+          // the serverside work is done.
+          setTimeout(() => {
+            updateState(appId, {jobUUIDs: {
+              ...state.jobUUIDs,
+              [uuid]: true,
+            }});
+        }, 120 * 1000);
+        }}
       />
       <Tooltip placement="top-start" hasArrow={true} label={'Remove Segments'} openDelay={400}>
         <Button onClick={() => apps.forEach(({ _id: appId }) => updateState(appId, { segments: [] }))}>

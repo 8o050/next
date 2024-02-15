@@ -22,15 +22,7 @@ const bboxType = z.record(
   })
 );
 
-export type Vertex = z.infer<typeof segmentVertexType>;
-const segmentVertexType = z.object({
-  x: z.number(),
-  y: z.number(),
-});
-
-const segmentsType = z.array(
-  z.array(segmentVertexType)
-);
+const segmentsType = z.array(z.array(z.array(z.boolean())));
 export type Segments = z.infer<typeof segmentsType>;
 
 export const schema = z.object({
@@ -44,6 +36,7 @@ export const schema = z.object({
     params: z.any(),
   }),
   imageUri: z.string(),
+  jobUUIDs: z.record(z.string()),
 });
 export type state = z.infer<typeof schema>;
 
@@ -55,6 +48,7 @@ export const init: Partial<state> = {
   segments: [],
   segmentsLoading: false,
   imageUri: '',
+  jobUUIDs: {},
 };
 
 export const name = 'ImageViewer';

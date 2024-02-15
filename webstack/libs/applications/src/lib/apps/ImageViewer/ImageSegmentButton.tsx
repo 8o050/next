@@ -1,77 +1,14 @@
-/*
+/**
  * Copyright (c) SAGE3 Development Team 2023. All Rights Reserved
  * University of Hawaii, University of Illinois Chicago, Virginia Tech
  *
  * Distributed under the terms of the SAGE3 License.  The full license is in
  * the file LICENSE, distributed as part of this software.
  */
-import { Button, Tooltip } from '@chakra-ui/react';
 
+import { Button, Tooltip } from '@chakra-ui/react';
 import React, { useCallback } from 'react';
 import { FaPuzzlePiece } from 'react-icons/fa';
-import { Segments, Vertex } from '.';
-
-// Segments look like these:
-// const MOCK_SEGMENT_DATA = [
-//   // Example segment data
-//   [
-//     { x: 50, y: 150 },
-//     { x: 60, y: 140 },
-//     { x: 75, y: 145 },
-//     { x: 90, y: 130 },
-//     { x: 110, y: 135 },
-//     { x: 130, y: 120 },
-//     { x: 150, y: 130 },
-//     { x: 170, y: 120 },
-//     { x: 190, y: 140 },
-//     { x: 180, y: 160 },
-//     { x: 160, y: 170 },
-//     { x: 140, y: 160 },
-//     { x: 120, y: 175 },
-//     { x: 100, y: 165 },
-//     { x: 80, y: 180 },
-//     { x: 60, y: 170 },
-//   ],
-// ];
-
-function generateNonOverlappingSegments(
-  numberOfSegments: number,
-  minVertices: number,
-  maxVertices: number,
-  canvasWidth: number,
-  canvasHeight: number
-): Vertex[][] {
-  const segments: Vertex[][] = [];
-  const sectionWidth = canvasWidth / Math.ceil(Math.sqrt(numberOfSegments));
-  const sectionHeight = canvasHeight / Math.ceil(Math.sqrt(numberOfSegments));
-
-  // Helper function to generate a random integer within a range
-  const getRandomInt = (min: number, max: number) => {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  };
-
-  for (let i = 0; i < numberOfSegments; i++) {
-    const segment: Vertex[] = [];
-    const numberOfVertices = getRandomInt(minVertices, maxVertices);
-    const sectionX = (i % Math.ceil(Math.sqrt(numberOfSegments))) * sectionWidth;
-    const sectionY = Math.floor(i / Math.ceil(Math.sqrt(numberOfSegments))) * sectionHeight;
-
-    for (let j = 0; j < numberOfVertices; j++) {
-      const vertex: Vertex = {
-        x: getRandomInt(sectionX, sectionX + sectionWidth),
-        y: getRandomInt(sectionY, sectionY + sectionHeight),
-      };
-      segment.push(vertex);
-    }
-
-    // Ensure the shape is closed by repeating the first vertex at the end
-    segment.push(segment[0]);
-
-    segments.push(segment);
-  }
-
-  return segments;
-}
 
 type Image = {
   appId: string;
@@ -80,29 +17,46 @@ type Image = {
 
 type OnFetchData = {
   appId: string;
-  segments: Segments;
+  uuid: string;
 };
 
 type Props = {
   images: Image[];
-  onClick?: (appId: string) => void;
-  onFetch: (data: OnFetchData) => void;
+  onStartGeneration: (data: OnFetchData) => void;
 };
 
-export const ImageSegmentButton: React.FC<Props> = ({ images, onClick, onFetch }) => {
-  const onButtonClick = useCallback(() => {
-    images.forEach(({ appId }) => {
-      onClick && onClick(appId);
-      setTimeout(
-        () =>
-          onFetch({
-            appId,
-            segments: generateNonOverlappingSegments(5, 2, 8, 400, 400),
-          }),
-        300
-      );
-    });
-  }, [images, onFetch]);
+export const ImageSegmentButton: React.FC<Props> = ({ images, onStartGeneration }) => {
+  const onButtonClick = useCallback(async () => {
+    for (const { appId, imageUri } of images) {
+      try {
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+  
+        if (!blob.type.includes('image')) {
+          console.error('image fetch failed');
+          continue; // Skip the current iteration if the blob is not an image
+        }
+  
+        const formData = new FormData();
+        const fileExtension: string = getFileExtension(blob.type);
+        formData.append('image', blob, `image${fileExtension}`);
+  
+        const segmentResponse = await fetch('/segment', {
+          method: 'POST',
+          body: formData,
+        });
+        const { uuid }: { uuid: string } = await segmentResponse.json();
+  
+        onStartGeneration({
+          appId,
+          uuid,
+        });
+      } catch (error) {
+        console.error('Error processing image:', error);
+      }
+    }
+  }, [images, onStartGeneration]);
+
   return (
     <Tooltip placement="top-start" hasArrow={true} label={'Segment Image'} openDelay={400}>
       <Button onClick={onButtonClick}>
@@ -111,3 +65,16 @@ export const ImageSegmentButton: React.FC<Props> = ({ images, onClick, onFetch }
     </Tooltip>
   );
 };
+
+function getFileExtension(mimeType: string): string {
+  const mimeTypesToExtension: { [key: string]: string } = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp', // Support for WebP
+    // Add more mappings as needed
+  };
+  
+  // Return the file extension if found, otherwise default to '.jpg'
+  return mimeTypesToExtension[mimeType] || '.jpg';
+}
