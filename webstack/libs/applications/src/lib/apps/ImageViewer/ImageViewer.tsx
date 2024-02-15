@@ -116,7 +116,6 @@ function AppComponent(props: App): JSX.Element {
     if (s.jobUUIDs == null) {
       return;
     }
-    console.log(s.jobUUIDs)
     const fetchSegData = async () => {
       Object.entries(s.jobUUIDs).forEach(async ([uuid, value]) => {
         if (value) {
